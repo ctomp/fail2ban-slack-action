@@ -1,4 +1,5 @@
 import argparse
+import logging
 
 import pycountry
 import requests
@@ -26,13 +27,16 @@ def main():
         # Should not happen, can restrict in args parser so this case won't matter
         msg = 'Unknown msg type'
 
-    slack_response = requests.post(f'https://hooks.slack.com/services/{args.webhook_url}', json={
-        "channel": "#alerts",
-        "username": "fail2ban",
-        "text": msg
-    }, timeout=2)
-    if slack_response.status_code != 200:
-        slack_response.raise_for_status()
+    try:
+        slack_response = requests.post(f'https://hooks.slack.com/services/{args.webhook_url}', json={
+            "channel": "#alerts",
+            "username": "fail2ban",
+            "text": msg
+        }, timeout=2)
+        if slack_response.status_code != 200:
+            slack_response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logging.exception(e)
 
 
 def create_ban_msg(args):
@@ -52,8 +56,8 @@ def create_ban_msg(args):
                 except LookupError:
                     return f'Banned :flag-{country_code}: {args.ip} (Unknown) in jail {args.jail} for ' \
                            f'{args.failures} {failure_txt}'
-    except requests.exceptions.RequestException:
-        pass
+    except requests.exceptions.RequestException as e:
+        logging.exception(e)
 
     return f'Banned {args.ip} (Unknown) in jail {args.jail} for {args.failures} {failure_txt}'
 
