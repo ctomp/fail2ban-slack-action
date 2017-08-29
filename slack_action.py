@@ -6,25 +6,26 @@ import requests
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('webhook_url', type=str)
-    parser.add_argument('msg_type', type=str)
-    parser.add_argument('jail', type=str)
-    parser.add_argument('ip', type=str)
-    parser.add_argument('failures', type=int)
+    parser = argparse.ArgumentParser(description='Send fail2ban action messages to Slack.')
+    parser.add_argument('webhook_url', type=str, help='Your webhook URL generated via Slack.')
+    parser.add_argument('action_type', type=str, choices=['ban', 'unban', 'start', 'stop'],
+                        help='The type of action from fail2ban.')
+    parser.add_argument('jail', type=str, help='The jail that the action belongs to.')
+    parser.add_argument('--ip', type=str, default='', help='The IP address that caused the action to occur.')
+    parser.add_argument('--num-failures', type=int, default=0, help='The number of failures by an IP address.')
 
     args = parser.parse_args()
 
-    if args.msg_type == 'ban':
+    if args.action_type == 'ban':
         msg = create_ban_msg(args)
-    elif args.msg_type == 'unban':
+    elif args.action_type == 'unban':
         msg = f'Removed {args.ip} from jail {args.jail}'
-    elif args.msg_type == 'start':
+    elif args.action_type == 'start':
         msg = f'Jail \'{args.jail}\' has been started'
-    elif args.msg_type == 'stop':
+    elif args.action_type == 'stop':
         msg = f'Jail \'{args.jail}\' has been stopped'
     else:
-        # Should not happen, can restrict in args parser so this case won't matter
+        # Should not happen, args parser restricts choices so this case won't matter
         msg = 'Unknown msg type'
 
     try:
@@ -40,7 +41,7 @@ def main():
 
 
 def create_ban_msg(args):
-    failure_txt = "failures" if args.failures != 1 else "failure"
+    failure_txt = "failures" if args.num_failures != 1 else "failure"
 
     # Fetch what country the IP hails from (for curiosity's sake)
     try:
@@ -52,14 +53,14 @@ def create_ban_msg(args):
                 try:
                     country = pycountry.countries.lookup(country_code)
                     return f'Banned :flag-{country_code}: {args.ip} ({country.name}) in jail {args.jail} for ' \
-                           f'{args.failures} {failure_txt}'
+                           f'{args.num_failures} {failure_txt}'
                 except LookupError:
                     return f'Banned :flag-{country_code}: {args.ip} (Unknown) in jail {args.jail} for ' \
-                           f'{args.failures} {failure_txt}'
+                           f'{args.num_failures} {failure_txt}'
     except requests.exceptions.RequestException as e:
         logging.exception(e)
 
-    return f'Banned {args.ip} (Unknown) in jail {args.jail} for {args.failures} {failure_txt}'
+    return f'Banned {args.ip} (Unknown) in jail {args.jail} for {args.num_failures} {failure_txt}'
 
 
 if __name__ == "__main__":
